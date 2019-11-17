@@ -140,15 +140,16 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
         'favicon': base_url + 'favicon.ico'
     }
 
-    items = []
-
     try:
         assert response_body['data']['results']
         logging.info(f"{len(response_body['data']['results'])} results found")
     except KeyError:
         msg = 'No results found.'
-        logging.error(msg)
-        return msg
+        logging.warning(msg)
+        output['items'] = []
+        return output
+
+    items = []
 
     for result in response_body['data']['results']:
         listing_card = result['listingCard']
