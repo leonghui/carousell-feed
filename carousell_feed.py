@@ -127,8 +127,9 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
 
     if strict:
         filters.append('strict')
-        term_list = set([term.lower() for term in query.split() if not term.isdigit()])
-        logging.info(f"Strict mode enabled, title must contain: {term_list}")
+        term_list = set([term.lower() for term in query.split()])
+        if term_list:
+            logging.info(f"Strict mode enabled, title must contain: {term_list}")
 
     if filters:
         title_strings.append(f"Filtered by {', '.join(filters)}")
@@ -182,7 +183,7 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
             }
         }
 
-        if not strict or all(item_title.lower().find(term) >= 0 for term in term_list):
+        if not strict or (term_list and all(item_title.lower().find(term) >= 0 for term in term_list)):
             items.append(item)
         else:
             logging.debug(f'Strict mode enabled, item "{item_title}" removed')
