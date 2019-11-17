@@ -165,11 +165,17 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
         item_desc = below_fold['paragraph1']
 
         above_fold = get_flattened_fold(listing_card['aboveFold'])
-        try:
-            time_stamp_dict = above_fold['time_created']
-        except KeyError:
-            logging.warning('aboveFold.time_created not found, replacing with aboveFold.expired_bump')
-            time_stamp_dict = above_fold['expired_bump']
+        time_stamp_labels = ['time_created', 'expired_bump', 'active_bump']
+        time_stamp_dict = {}
+
+        for label in time_stamp_labels:
+            try:
+                if not time_stamp_dict:
+                    time_stamp_dict = above_fold.get(label)
+            except KeyError:
+                logging.warning(f"aboveFold.{label} not found, trying next label")
+                continue
+
         time_stamp = time_stamp_dict['seconds']['low']
 
         item = {
