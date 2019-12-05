@@ -129,7 +129,7 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
         filters.append('strict')
         term_list = set([term.lower() for term in query.split()])
         if term_list:
-            logging.info(f"Strict mode enabled, title must contain: {term_list}")
+            logging.debug(f"Strict mode enabled, title must contain: {term_list}")
 
     if filters:
         title_strings.append(f"Filtered by {', '.join(filters)}")
@@ -143,7 +143,7 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
 
     try:
         assert response_body['data']['results']
-        logging.info(f"{len(response_body['data']['results'])} results found")
+        logging.debug(f"{len(response_body['data']['results'])} results found")
     except KeyError:
         msg = 'No results found.'
         logging.warning(msg)
@@ -195,6 +195,6 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
             logging.debug(f'Strict mode enabled, item "{item_title}" removed')
 
     output['items'] = items
-    logging.info(f"{len(items)} results published")
+    logging.debug(f"{len(items)} results published")
 
     return output
