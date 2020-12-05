@@ -161,7 +161,12 @@ def get_top_level_feed(base_url, search_query):
     return output
 
 
-def get_timestamp_dict(above_fold):
+def get_timestamp(base_url, listing_card):
+    listing_url = base_url + LISTING_ENDPOINT
+
+    item_id = listing_card['id']
+    above_fold = get_flattened_fold(listing_card['aboveFold'])
+
     timestamp_labels = ['time_created', 'expired_bump', 'active_bump']
     timestamp_dict = {}
 
@@ -174,7 +179,22 @@ def get_timestamp_dict(above_fold):
                 f"aboveFold.{label} not found, trying next label")
             continue
 
-    return timestamp_dict
+    if timestamp_dict is None:
+        listing_response = get_listing_response(listing_url, item_id)
+
+        try:
+            assert listing_response['data']
+            datetime_obj = datetime.strptime(
+                listing_response['data']['time_created'], '%Y-%m-%dT%H:%M:%SZ')
+            timestamp = datetime_obj.timestamp()
+        except KeyError:
+            logging.warning(
+                'Value time_created not found in listing ' + item_id)
+            timestamp = datetime.now().timestamp()
+    else:
+        timestamp = timestamp_dict['seconds']['low']
+
+    return timestamp
 
 
 def get_listing(search_query):
@@ -182,7 +202,6 @@ def get_listing(search_query):
 
     base_url = get_redirected_domain()
     search_url = base_url + SEARCH_ENDPOINT
-    listing_url = base_url + LISTING_ENDPOINT
 
     response_body = get_search_response(search_url, search_payload)
     output = get_top_level_feed(base_url, search_query)
@@ -214,23 +233,7 @@ def get_listing(search_query):
         item_price = below_fold['header_2']
         item_desc = below_fold['paragraph1']
 
-        above_fold = get_flattened_fold(listing_card['aboveFold'])
-        timestamp_dict = get_timestamp_dict(above_fold)
-
-        if timestamp_dict is None:
-            listing_response = get_listing_response(listing_url, item_id)
-
-            try:
-                assert listing_response['data']
-                datetime_obj = datetime.strptime(
-                    listing_response['data']['time_created'], '%Y-%m-%dT%H:%M:%SZ')
-                timestamp = datetime_obj.timestamp()
-            except KeyError:
-                logging.warning(
-                    'Value time_created not found in listing ' + item_id)
-                timestamp = datetime.now().timestamp()
-        else:
-            timestamp = timestamp_dict['seconds']['low']
+        timestamp = get_timestamp(base_url, listing_card)
 
         item = {
             'id': item_url,
