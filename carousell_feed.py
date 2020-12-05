@@ -34,7 +34,8 @@ def get_country_id(country):
 def get_flattened_fold(fold_objects):
     keys = [list(string_obj.values())[0] for string_obj in fold_objects]
     # For 'belowFold' strings, relabel 'paragraph' keys by appending indices
-    unique_keys = [key + str(index - 1) if key == 'paragraph' else key for index, key in enumerate(keys)]
+    unique_keys = [key + str(index - 1) if key ==
+                   'paragraph' else key for index, key in enumerate(keys)]
     values = [list(string_obj.values())[1] for string_obj in fold_objects]
 
     return dict(zip(unique_keys, values))
@@ -111,7 +112,8 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
     term_list = []
     filters = []
 
-    home_page_url_params = [f"search={quote(query)}", 'sort_by=time_created,descending']
+    home_page_url_params = [
+        f"search={quote(query)}", 'sort_by=time_created,descending']
 
     if min_price:
         filters.append(f"min {min_price}")
@@ -129,7 +131,8 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
         filters.append('strict')
         term_list = set([term.lower() for term in query.split()])
         if term_list:
-            logging.debug(f"Strict mode enabled, title must contain: {term_list}")
+            logging.debug(
+                f"Strict mode enabled, title must contain: {term_list}")
 
     if filters:
         title_strings.append(f"Filtered by {', '.join(filters)}")
@@ -173,7 +176,8 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
                 if not time_stamp_dict:
                     time_stamp_dict = above_fold.get(label)
             except KeyError:
-                logging.warning(f"aboveFold.{label} not found, trying next label")
+                logging.warning(
+                    f"aboveFold.{label} not found, trying next label")
                 continue
 
         time_stamp = time_stamp_dict['seconds']['low']
