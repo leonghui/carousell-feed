@@ -45,20 +45,15 @@ def get_flattened_fold(fold_objects):
     return dict(zip(unique_keys, values))
 
 
-def get_post_response(url, payload):
-    logging.debug(f"Querying endpoint: {url}")
-    logging.debug(f"Payload: {payload}")
-
-    post_request = requests.post(url, json=payload)
-
+def get_response_body(response):
     try:
-        response_body = post_request.json()
+        response_body = response.json()
     except JSONDecodeError:
-        return post_request.text
+        return response.text
 
     # return HTTP error code
-    if not post_request.ok:
-        msg = f"HTTP error {post_request.status_code}"
+    if not response.ok:
+        msg = f"HTTP error {response.status_code}"
         logging.error(msg)
         return msg
 
@@ -72,6 +67,14 @@ def get_post_response(url, payload):
         return msg
 
     return response_body
+
+
+def get_search_response(url, payload):
+    logging.debug(f"Querying endpoint: {url}")
+    logging.debug(f"Payload: {payload}")
+    api_response = requests.post(url, json=payload)
+
+    return get_response_body(api_response)
 
 
 def get_search_payload(search_query):
@@ -173,7 +176,7 @@ def get_listing(search_query):
     base_url = get_redirected_domain()
     search_url = base_url + SEARCH_ENDPOINT
 
-    response_body = get_post_response(search_url, search_payload)
+    response_body = get_search_response(search_url, search_payload)
     output = get_top_level_feed(base_url, search_query)
 
     if search_query.strict:
