@@ -41,8 +41,36 @@ def get_flattened_fold(fold_objects):
     return dict(zip(unique_keys, values))
 
 
-def get_listing(query, min_price=None, max_price=None, country=None, used_only=False, strict=False,
-                count=FEED_ITEM_LIMIT):
+def get_post_response(endpoint, payload):
+    logging.debug(f"Querying endpoint: {endpoint}")
+    logging.debug(f"Payload: {payload}")
+
+    post_request = requests.post(endpoint, json=payload)
+
+    try:
+        response_body = post_request.json()
+    except JSONDecodeError:
+        return post_request.text
+
+    # return HTTP error code
+    if not post_request.ok:
+        msg = f"HTTP error {post_request.status_code}"
+        logging.error(msg)
+        return msg
+
+    # return API error message
+    if response_body.get('error') is not None:
+        msg = {
+            'error': response_body.get('error').get('code'),
+            'message': response_body.get('error').get('message')
+        }
+        logging.error(msg)
+        return msg
+
+    return response_body
+
+
+def get_search_payload(count, query, min_price, max_price, used_only, country):
     payload = {
         'count': count,
         'filters': [],
@@ -76,33 +104,18 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
     if country:
         payload['countryId'] = get_country_id(country)
 
+    return payload
+
+
+def get_listing(query, min_price=None, max_price=None, country=None, used_only=False, strict=False,
+                count=FEED_ITEM_LIMIT):
+    search_payload = get_search_payload(
+        count, query, min_price, max_price, used_only, country)
+
     base_url = get_redirected_domain()
-    api_endpoint = base_url + 'api-service/filter/search/3.3/products/'
+    search_endpoint = base_url + 'api-service/filter/search/3.3/products/'
 
-    logging.debug(f"Querying endpoint: {api_endpoint}")
-    logging.debug(f"Payload: {payload}")
-
-    post_request = requests.post(api_endpoint, json=payload)
-
-    try:
-        response_body = post_request.json()
-    except JSONDecodeError:
-        return post_request.text
-
-    # return HTTP error code
-    if not post_request.ok:
-        msg = f"HTTP error {post_request.status_code}"
-        logging.error(msg)
-        return msg
-
-    # return API error message
-    if response_body.get('error') is not None:
-        msg = {
-            'error': response_body.get('error').get('code'),
-            'message': response_body.get('error').get('message')
-        }
-        logging.error(msg)
-        return msg
+    response_body = get_post_response(search_endpoint, search_payload)
 
     parse_object = urlparse(base_url)
     domain = parse_object.netloc
