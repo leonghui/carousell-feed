@@ -162,34 +162,27 @@ def get_top_level_feed(base_url, search_query):
 
 
 def get_timestamp(base_url, listing_card):
+    TIME_CREATED_KEY = 'time_created'
     listing_url = base_url + LISTING_ENDPOINT
 
     item_id = listing_card['id']
     above_fold = get_flattened_fold(listing_card['aboveFold'])
 
-    timestamp_labels = ['time_created', 'expired_bump', 'active_bump']
-    timestamp_dict = {}
-
-    for label in timestamp_labels:
-        try:
-            if not timestamp_dict:
-                timestamp_dict = above_fold.get(label)
-        except KeyError:
-            logging.warning(
-                f"aboveFold.{label} not found, trying next label")
-            continue
+    timestamp_dict = above_fold.get(TIME_CREATED_KEY)
 
     if timestamp_dict is None:
+        logging.warning(
+            'Value ' + TIME_CREATED_KEY + ' not found for search listing ' + item_id)
         listing_response = get_listing_response(listing_url, item_id)
 
         try:
             assert listing_response['data']
             datetime_obj = datetime.strptime(
-                listing_response['data']['time_created'], '%Y-%m-%dT%H:%M:%SZ')
+                listing_response['data'][TIME_CREATED_KEY], '%Y-%m-%dT%H:%M:%SZ')
             timestamp = datetime_obj.timestamp()
         except KeyError:
             logging.warning(
-                'Value time_created not found in listing ' + item_id)
+                'Value ' + TIME_CREATED_KEY + ' not found for listing ' + item_id)
             timestamp = datetime.now().timestamp()
     else:
         timestamp = timestamp_dict['seconds']['low']
