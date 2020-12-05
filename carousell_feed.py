@@ -7,6 +7,8 @@ import requests
 
 JSONFEED_VERSION_URL = 'https://jsonfeed.org/version/1'
 FEED_ITEM_LIMIT = 20
+SEARCH_ENDPOINT = 'api-service/filter/search/3.3/products/'
+LISTING_ENDPOINT = 'api-service/listing/3.1/listings/'
 
 country_to_geocode = {
     'AU': '2077456',
@@ -113,7 +115,7 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
         count, query, min_price, max_price, used_only, country)
 
     base_url = get_redirected_domain()
-    search_endpoint = base_url + 'api-service/filter/search/3.3/products/'
+    search_endpoint = base_url + SEARCH_ENDPOINT
 
     response_body = get_post_response(search_endpoint, search_payload)
 
