@@ -111,20 +111,13 @@ def get_search_payload(search_query):
     return payload
 
 
-def get_listing(search_query):
-    search_payload = get_search_payload(search_query)
-
-    base_url = get_redirected_domain()
-    search_endpoint = base_url + SEARCH_ENDPOINT
-
-    response_body = get_post_response(search_endpoint, search_payload)
+def get_top_level_feed(base_url, search_query):
 
     parse_object = urlparse(base_url)
     domain = parse_object.netloc
 
     title_strings = [domain, f'Search results for "{search_query.query}"']
 
-    term_list = []
     filters = []
 
     home_page_url_params = [
@@ -144,10 +137,6 @@ def get_listing(search_query):
 
     if search_query.strict:
         filters.append('strict')
-        term_list = set([term.lower() for term in search_query.query.split()])
-        if term_list:
-            logging.debug(
-                f"Strict mode enabled, title must contain: {term_list}")
 
     if filters:
         title_strings.append(f"Filtered by {', '.join(filters)}")
@@ -158,6 +147,22 @@ def get_listing(search_query):
         'home_page_url': base_url + 'search/products/?' + '&'.join(home_page_url_params),
         'favicon': base_url + 'favicon.ico'
     }
+
+    return output
+
+
+def get_listing(search_query):
+    search_payload = get_search_payload(search_query)
+
+    base_url = get_redirected_domain()
+    search_url = base_url + SEARCH_ENDPOINT
+
+    response_body = get_post_response(search_url, search_payload)
+    output = get_top_level_feed(base_url, search_query)
+
+    if search_query.strict:
+        term_list = set([term.lower() for term in search_query.query.split()])
+        logging.debug(f"Strict mode enabled, title must contain: {term_list}")
 
     try:
         assert response_body['data']['results']
