@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import logging
 from json.decoder import JSONDecodeError
 from urllib.parse import quote, urlparse
@@ -73,6 +73,13 @@ def get_search_response(url, payload):
     logging.debug(f"Querying endpoint: {url}")
     logging.debug(f"Payload: {payload}")
     api_response = requests.post(url, json=payload)
+
+    return get_response_body(api_response)
+
+
+def get_listing_response(url, item_id):
+    logging.debug(f"Querying endpoint: {url}/{item_id}")
+    api_response = requests.post(url + '/' + item_id)
 
     return get_response_body(api_response)
 
@@ -175,6 +182,7 @@ def get_listing(search_query):
 
     base_url = get_redirected_domain()
     search_url = base_url + SEARCH_ENDPOINT
+    listing_url = base_url + LISTING_ENDPOINT
 
     response_body = get_search_response(search_url, search_payload)
     output = get_top_level_feed(base_url, search_query)
@@ -209,14 +217,27 @@ def get_listing(search_query):
         above_fold = get_flattened_fold(listing_card['aboveFold'])
         timestamp_dict = get_timestamp_dict(above_fold)
 
-        timestamp = timestamp_dict['seconds']['low']
+        if timestamp_dict is None:
+            listing_response = get_listing_response(listing_url, item_id)
+
+            try:
+                assert listing_response['data']
+                datetime_obj = datetime.strptime(
+                    listing_response['data']['time_created'], '%Y-%m-%dT%H:%M:%SZ')
+                timestamp = datetime_obj.timestamp()
+            except KeyError:
+                logging.warning(
+                    'Value time_created not found in listing ' + item_id)
+                timestamp = datetime.now().timestamp()
+        else:
+            timestamp = timestamp_dict['seconds']['low']
 
         item = {
             'id': item_url,
             'url': item_url,
             'title': f"[{item_price}] {item_title}",
             'content_text': item_desc,
-            'date_published': datetime.datetime.utcfromtimestamp(timestamp).isoformat('T'),
+            'date_published': datetime.utcfromtimestamp(timestamp).isoformat('T'),
             'author': {
                 'name': username
             }
