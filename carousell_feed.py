@@ -45,11 +45,11 @@ def get_flattened_fold(fold_objects):
     return dict(zip(unique_keys, values))
 
 
-def get_post_response(endpoint, payload):
-    logging.debug(f"Querying endpoint: {endpoint}")
+def get_post_response(url, payload):
+    logging.debug(f"Querying endpoint: {url}")
     logging.debug(f"Payload: {payload}")
 
-    post_request = requests.post(endpoint, json=payload)
+    post_request = requests.post(url, json=payload)
 
     try:
         response_body = post_request.json()
