@@ -2,8 +2,10 @@ import datetime
 import logging
 from json.decoder import JSONDecodeError
 from urllib.parse import quote, urlparse
+from search_query_class import SearchQueryClass
 
 import requests
+
 
 JSONFEED_VERSION_URL = 'https://jsonfeed.org/version/1'
 FEED_ITEM_LIMIT = 20
@@ -72,11 +74,11 @@ def get_post_response(endpoint, payload):
     return response_body
 
 
-def get_search_payload(count, query, min_price, max_price, used_only, country):
+def get_search_payload(search_query):
     payload = {
-        'count': count,
+        'count': FEED_ITEM_LIMIT,
         'filters': [],
-        'query': query,
+        'query': search_query.query,
         'sortParam': {
             'fieldName': 'time_created'
         }
@@ -87,32 +89,30 @@ def get_search_payload(count, query, min_price, max_price, used_only, country):
         'fieldName': 'price'
     }
 
-    if min_price:
-        price_dict['rangedFloat']['start'] = {'value': min_price}
+    if search_query.min_price:
+        price_dict['rangedFloat']['start'] = {'value': search_query.min_price}
 
-    if max_price:
-        price_dict['rangedFloat']['end'] = {'value': max_price}
+    if search_query.max_price:
+        price_dict['rangedFloat']['end'] = {'value': search_query.max_price}
 
     if price_dict['rangedFloat']:
         payload['filters'].append(price_dict)
 
-    if used_only:
+    if search_query.used_only:
         used_dict = {
             'idsOrKeywords': {'value': ['USED']},
             'fieldName': 'condition_v2'
         }
         payload['filters'].append(used_dict)
 
-    if country:
-        payload['countryId'] = get_country_id(country)
+    if search_query.country:
+        payload['countryId'] = get_country_id(search_query.country)
 
     return payload
 
 
-def get_listing(query, min_price=None, max_price=None, country=None, used_only=False, strict=False,
-                count=FEED_ITEM_LIMIT):
-    search_payload = get_search_payload(
-        count, query, min_price, max_price, used_only, country)
+def get_listing(search_query):
+    search_payload = get_search_payload(search_query)
 
     base_url = get_redirected_domain()
     search_endpoint = base_url + SEARCH_ENDPOINT
@@ -122,29 +122,29 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
     parse_object = urlparse(base_url)
     domain = parse_object.netloc
 
-    title_strings = [domain, f'Search results for "{query}"']
+    title_strings = [domain, f'Search results for "{search_query.query}"']
 
     term_list = []
     filters = []
 
     home_page_url_params = [
-        f"search={quote(query)}", 'sort_by=time_created,descending']
+        f"search={quote(search_query.query)}", 'sort_by=time_created,descending']
 
-    if min_price:
-        filters.append(f"min {min_price}")
-        home_page_url_params.append(f"price_start={min_price}")
+    if search_query.min_price:
+        filters.append(f"min {search_query.min_price}")
+        home_page_url_params.append(f"price_start={search_query.min_price}")
 
-    if max_price:
-        filters.append(f"max {max_price}")
-        home_page_url_params.append(f"price_end={max_price}")
+    if search_query.max_price:
+        filters.append(f"max {search_query.max_price}")
+        home_page_url_params.append(f"price_end={search_query.max_price}")
 
-    if used_only:
+    if search_query.used_only:
         filters.append('used only')
         home_page_url_params.append('condition_v2=USED')
 
-    if strict:
+    if search_query.strict:
         filters.append('strict')
-        term_list = set([term.lower() for term in query.split()])
+        term_list = set([term.lower() for term in search_query.query.split()])
         if term_list:
             logging.debug(
                 f"Strict mode enabled, title must contain: {term_list}")
@@ -208,7 +208,7 @@ def get_listing(query, min_price=None, max_price=None, country=None, used_only=F
             }
         }
 
-        if not strict or (term_list and all(item_title.lower().find(term) >= 0 for term in term_list)):
+        if not search_query.strict or (term_list and all(item_title.lower().find(term) >= 0 for term in term_list)):
             items.append(item)
         else:
             logging.debug(f'Strict mode enabled, item "{item_title}" removed')
