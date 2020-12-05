@@ -151,6 +151,22 @@ def get_top_level_feed(base_url, search_query):
     return output
 
 
+def get_timestamp_dict(above_fold):
+    timestamp_labels = ['time_created', 'expired_bump', 'active_bump']
+    timestamp_dict = {}
+
+    for label in timestamp_labels:
+        try:
+            if not timestamp_dict:
+                timestamp_dict = above_fold.get(label)
+        except KeyError:
+            logging.warning(
+                f"aboveFold.{label} not found, trying next label")
+            continue
+
+    return timestamp_dict
+
+
 def get_listing(search_query):
     search_payload = get_search_payload(search_query)
 
@@ -188,26 +204,16 @@ def get_listing(search_query):
         item_desc = below_fold['paragraph1']
 
         above_fold = get_flattened_fold(listing_card['aboveFold'])
-        time_stamp_labels = ['time_created', 'expired_bump', 'active_bump']
-        time_stamp_dict = {}
+        timestamp_dict = get_timestamp_dict(above_fold)
 
-        for label in time_stamp_labels:
-            try:
-                if not time_stamp_dict:
-                    time_stamp_dict = above_fold.get(label)
-            except KeyError:
-                logging.warning(
-                    f"aboveFold.{label} not found, trying next label")
-                continue
-
-        time_stamp = time_stamp_dict['seconds']['low']
+        timestamp = timestamp_dict['seconds']['low']
 
         item = {
             'id': item_url,
             'url': item_url,
             'title': f"[{item_price}] {item_title}",
             'content_text': item_desc,
-            'date_published': datetime.datetime.utcfromtimestamp(time_stamp).isoformat('T'),
+            'date_published': datetime.datetime.utcfromtimestamp(timestamp).isoformat('T'),
             'author': {
                 'name': username
             }
