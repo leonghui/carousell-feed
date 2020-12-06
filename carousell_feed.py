@@ -190,6 +190,14 @@ def get_timestamp(base_url, listing_card):
     return timestamp
 
 
+def get_thumbnail(listing_card):
+    photo_urls = listing_card['photoUrls']
+    if len(photo_urls) > 0:
+        thumbnail_url = photo_urls[0]
+
+    return thumbnail_url
+
+
 def get_listing(search_query):
     search_payload = get_search_payload(search_query)
 
@@ -227,6 +235,7 @@ def get_listing(search_query):
         item_desc = below_fold['paragraph1']
 
         timestamp = get_timestamp(base_url, listing_card)
+        image_url = get_thumbnail(listing_card)
 
         item = {
             'id': item_url,
@@ -238,6 +247,9 @@ def get_listing(search_query):
                 'name': username
             }
         }
+
+        if image_url is not None:
+            item['image'] = image_url
 
         if not search_query.strict or (term_list and all(item_title.lower().find(term) >= 0 for term in term_list)):
             items.append(item)
