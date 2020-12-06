@@ -1,9 +1,10 @@
 from datetime import datetime
-import logging
 from json.decoder import JSONDecodeError
-from urllib.parse import quote, urlparse
 from search_query_class import SearchQueryClass
+from urllib.parse import quote, urlparse
 
+import bleach
+import logging
 import requests
 
 
@@ -24,6 +25,12 @@ country_to_geocode = {
 }
 
 logging.basicConfig(level=logging.INFO)
+
+allowed_tags = bleach.ALLOWED_TAGS + ['br', 'img', 'span', 'u', 'p']
+allowed_attributes = bleach.ALLOWED_ATTRIBUTES.copy()
+allowed_attributes.update({'img': ['src']})
+allowed_attributes.update({'span': ['style']})
+allowed_styles = ['color']
 
 
 def get_redirected_domain():
@@ -237,11 +244,18 @@ def get_listing(search_query):
         timestamp = get_timestamp(base_url, listing_card)
         thumbnail_url = get_thumbnail(listing_card)
 
+        content_body = f'<img src=\"{thumbnail_url}\" /><p>{item_desc}</p>'
+
         item = {
             'id': item_url,
             'url': item_url,
             'title': f"[{item_price}] {item_title}",
-            'content_html': f'<img src=\"{thumbnail_url}\" /><p>{item_desc}</p>',
+            'content_html': bleach.clean(
+                content_body,
+                tags=allowed_tags,
+                attributes=allowed_attributes,
+                styles=allowed_styles
+            ),
             'date_published': datetime.utcfromtimestamp(timestamp).isoformat('T'),
             'author': {
                 'name': username
