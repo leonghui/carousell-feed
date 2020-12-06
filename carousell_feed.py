@@ -235,21 +235,21 @@ def get_listing(search_query):
         item_desc = below_fold['paragraph1']
 
         timestamp = get_timestamp(base_url, listing_card)
-        image_url = get_thumbnail(listing_card)
+        thumbnail_url = get_thumbnail(listing_card)
 
         item = {
             'id': item_url,
             'url': item_url,
             'title': f"[{item_price}] {item_title}",
-            'content_text': item_desc,
+            'content_html': f'<img src=\"{thumbnail_url}\" /><p>{item_desc}</p>',
             'date_published': datetime.utcfromtimestamp(timestamp).isoformat('T'),
             'author': {
                 'name': username
             }
         }
 
-        if image_url is not None:
-            item['image'] = image_url
+        if thumbnail_url is not None:
+            item['image'] = thumbnail_url
 
         if not search_query.strict or (term_list and all(item_title.lower().find(term) >= 0 for term in term_list)):
             items.append(item)
