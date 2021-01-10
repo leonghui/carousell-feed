@@ -3,6 +3,7 @@ from urllib.parse import quote, urlparse
 from flask import abort
 from requests import Session
 from dataclasses import asdict
+from time import sleep
 
 import json
 import bleach
@@ -118,7 +119,8 @@ def get_listing_response(base_url, item_id, query_object, logger):
     logger.debug(
         f'"{query_object.query}" - Querying endpoint: {listing_url}{item_id}')
     response = session.get(listing_url + item_id)
-
+    sleep(1)
+    
     return process_response(response, query_object, logger)
 
 
