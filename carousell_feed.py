@@ -5,7 +5,6 @@ from requests import Session
 from dataclasses import asdict
 from time import sleep
 
-import json
 import bleach
 
 from carousell_feed_data import CarousellSearchQuery
