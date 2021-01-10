@@ -83,19 +83,19 @@ def process_response(response, query_object, logger):
     # return HTTP error code
     if not response.ok:
         logger.debug(
-            f'"{query_object.query}" - Error from source, dumping input:')
+            f'"{query_object.query}" - error from source, dumping input:')
         logger.debug(response.text)
         abort(
-            500, description=f'"{query_object.query}" - HTTP status from source: {response.status_code}')
+            500, description='HTTP status from source: ' + response.status_code)
 
     try:
         return response.json()
     except ValueError:
         logger.debug(
-            f'"{query_object.query}" - Invalid API response, dumping input:')
+            f'"{query_object.query}" - invalid API response, dumping input:')
         logger.debug(response.text)
         abort(
-            500, description=f'"{query_object.query}" - Invalid API response')
+            500, description='Invalid API response')
 
 
 def get_search_response(base_url, query_object, logger):
@@ -104,8 +104,8 @@ def get_search_response(base_url, query_object, logger):
 
     payload = get_search_payload(query_object, logger)
 
-    logger.debug(f'"{query_object.query}" - Querying endpoint: {search_url}')
-    logger.debug(f'"{query_object.query}" - Payload: {payload}')
+    logger.debug(f'"{query_object.query}" - querying endpoint: {search_url}')
+    logger.debug(f'"{query_object.query}" - payload: {payload}')
     response = session.post(search_url, json=payload)
 
     return process_response(response, query_object, logger)
@@ -116,10 +116,10 @@ def get_listing_response(base_url, item_id, query_object, logger):
     listing_url = base_url + LISTING_ENDPOINT
 
     logger.debug(
-        f'"{query_object.query}" - Querying endpoint: {listing_url}{item_id}')
+        f'"{query_object.query}" - querying endpoint: {listing_url}{item_id}')
     response = session.get(listing_url + item_id)
     sleep(1)
-    
+
     return process_response(response, query_object, logger)
 
 
@@ -166,7 +166,7 @@ def get_top_level_feed(base_url, query_object):
     return json_feed
 
 
-def get_timestamp(base_url, listing_card, search_query, logger):
+def get_timestamp(base_url, listing_card, query_obj, logger):
     # attempt to extract timestamp (in Unix time) from search result
     # if unavailable, extract timestamp (in str) from item listing
 
@@ -180,14 +180,16 @@ def get_timestamp(base_url, listing_card, search_query, logger):
         if timestamp_dict:
             return timestamp_dict['seconds']['low']
         else:
-            logger.info(TIME_CREATED_KEY + ' not found for item ' + item_id)
+            logger.info(
+                f'"{query_obj.query}" - {TIME_CREATED_KEY} not found for item {item_id}')
             response_json = get_listing_response(
-                base_url, item_id, search_query, logger)
+                base_url, item_id, query_obj, logger)
             datetime_obj = datetime.strptime(
                 response_json['data'][TIME_CREATED_KEY], '%Y-%m-%dT%H:%M:%SZ')
             return datetime_obj.timestamp()
     except KeyError:
-        logger.info('Using default timestamp for item ' + item_id)
+        logger.info(
+            f'"{query_obj.query}" - using default timestamp for item {item_id}')
         return datetime.now().timestamp()
 
 
