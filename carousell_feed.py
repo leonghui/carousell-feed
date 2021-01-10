@@ -193,7 +193,7 @@ def get_timestamp(base_url, listing_card, query_obj, logger):
         return datetime.now().timestamp()
 
 
-def get_thumbnail(listing_card):
+def get_item_thumbnail(listing_card):
     try:
         return listing_card['photoUrls'][0]
     except KeyError:
@@ -228,29 +228,32 @@ def get_search_results(search_query, logger):
             item_title = below_fold.get('header_1')
             item_price = below_fold.get('header_2')
             item_desc = below_fold.get('paragraph1')
+            item_content_html = f"<p>{item_desc}</p>"
 
             timestamp = get_timestamp(
                 base_url, listing_card, search_query, logger)
-            thumbnail_url = get_thumbnail(listing_card)
+            item_thumbnail_url = get_item_thumbnail(listing_card)
+            item_thumbnail_html = f'<img src=\"{item_thumbnail_url}\" />'
 
-            content_body = f'<img src=\"{thumbnail_url}\" /><p>{item_desc}</p>'
+            content_body_list = [item_content_html]
+
+            if item_thumbnail_url:
+                content_body_list.insert(0, item_thumbnail_html)
+
+            content_body = ''.join(content_body_list)
+
+            sanitized_html = bleach.clean(
+                content_body, tags=allowed_tags, attributes=allowed_attributes)
 
             feed_item = JsonFeedItem(
                 id=item_url,
                 url=item_url,
                 title=f"[{item_price}] {item_title}",
-                content_html=bleach.clean(
-                    content_body,
-                    tags=allowed_tags,
-                    attributes=allowed_attributes
-                ),
+                content_html=sanitized_html,
                 date_published=datetime.utcfromtimestamp(
                     timestamp).isoformat('T'),
                 author=JsonFeedAuthor(name=username)
             )
-
-            if thumbnail_url:
-                feed_item.image = thumbnail_url
 
             if search_query.strict and (term_list and not all(item_title.lower().find(term) >= 0 for term in term_list)):
                 logger.debug(
