@@ -82,7 +82,7 @@ def process_response(response, query_object, logger):
 
     # return HTTP error code
     if not response.ok:
-        logger.debug(
+        logger.error(
             f'"{query_object.query}" - error from source, dumping input:')
         logger.debug(response.text)
         abort(
@@ -91,7 +91,7 @@ def process_response(response, query_object, logger):
     try:
         return response.json()
     except ValueError:
-        logger.debug(
+        logger.error(
             f'"{query_object.query}" - invalid API response, dumping input:')
         logger.debug(response.text)
         abort(
