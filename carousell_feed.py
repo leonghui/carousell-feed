@@ -1,5 +1,5 @@
 from datetime import datetime
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlparse, urlencode
 from flask import abort
 from requests import Session
 from dataclasses import asdict
@@ -132,20 +132,22 @@ def get_top_level_feed(base_url, query_object):
 
     filters = []
 
-    home_page_url_params = [
-        f"search={quote(query_object.query)}", 'sort_by=time_created,descending']
+    search_params_dict = {
+        'search': quote(query_object.query),
+        'sort_by': 'time_created,descending'
+    }
 
     if query_object.min_price:
         filters.append(f"min {query_object.min_price}")
-        home_page_url_params.append(f"price_start={query_object.min_price}")
+        search_params_dict['price_start'] = query_object.min_price
 
     if query_object.max_price:
         filters.append(f"max {query_object.max_price}")
-        home_page_url_params.append(f"price_end={query_object.max_price}")
+        search_params_dict['price_end'] = query_object.max_price
 
     if query_object.used_only:
         filters.append('used only')
-        home_page_url_params.append('condition_v2=USED')
+        search_params_dict['condition_v2'] = 'USED'
 
     if query_object.strict:
         filters.append('strict')
@@ -157,7 +159,7 @@ def get_top_level_feed(base_url, query_object):
         items=[],
         title=' - '.join(title_strings),
         home_page_url=base_url + 'search/products/?' +
-        '&'.join(home_page_url_params),
+        urlencode(search_params_dict),
         favicon=base_url + 'favicon.ico'
     )
 
