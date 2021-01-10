@@ -1,45 +1,35 @@
 from datetime import datetime
-from json.decoder import JSONDecodeError
-from search_query_class import SearchQueryClass
 from urllib.parse import quote, urlparse
+from flask import abort
+from requests import Session
+from dataclasses import asdict
 
+import json
 import bleach
-import logging
-import requests
+
+from carousell_feed_data import CarousellSearchQuery
+from json_feed_data import JsonFeedTopLevel, JsonFeedItem, JsonFeedAuthor
 
 
-JSONFEED_VERSION_URL = 'https://jsonfeed.org/version/1'
-FEED_ITEM_LIMIT = 20
+FEED_ITEM_LIMIT = 22
 SEARCH_ENDPOINT = 'api-service/filter/search/3.3/products/'
 LISTING_ENDPOINT = 'api-service/listing/3.1/listings/'
 
-country_to_geocode = {
-    'AU': '2077456',
-    'CA': '6251999',
-    'ID': '1643084',
-    'MY': '1733045',
-    'NZ': '2186224',
-    'PH': '1694008',
-    'SG': '1880251',
-    'TW': '1668284'
-}
-
-logging.basicConfig(level=logging.INFO)
-
-allowed_tags = bleach.ALLOWED_TAGS + ['br', 'img', 'span', 'u', 'p']
+allowed_tags = bleach.ALLOWED_TAGS + ['img', 'p']
 allowed_attributes = bleach.ALLOWED_ATTRIBUTES.copy()
 allowed_attributes.update({'img': ['src']})
-allowed_attributes.update({'span': ['style']})
-allowed_styles = ['color']
+
+session = Session()
 
 
-def get_redirected_domain():
-    request = requests.head('https://carousell.com', allow_redirects=True)
-    return request.url
-
-
-def get_country_id(country):
-    return country_to_geocode.get(country)
+# modified from https://stackoverflow.com/a/24893252
+def remove_empty_from_dict(d):
+    if isinstance(d, dict):
+        return dict((k, remove_empty_from_dict(v)) for k, v in d.items() if v and remove_empty_from_dict(v))
+    elif isinstance(d, list):
+        return [remove_empty_from_dict(v) for v in d if v and remove_empty_from_dict(v)]
+    else:
+        return d
 
 
 def get_flattened_fold(fold_objects):
@@ -52,48 +42,11 @@ def get_flattened_fold(fold_objects):
     return dict(zip(unique_keys, values))
 
 
-def get_response_body(response):
-    try:
-        response_body = response.json()
-    except JSONDecodeError:
-        return response.text
-
-    # return HTTP error code
-    if not response.ok:
-        msg = f"HTTP error {response.status_code}"
-        logging.error(msg)
-        return msg
-
-    # return API error message
-    if response_body.get('error') is not None:
-        msg = {
-            'error': response_body.get('error').get('code'),
-            'message': response_body.get('error').get('message')
-        }
-        logging.error(msg)
-        return msg
-
-    return response_body
-
-
-def get_search_response(url, payload):
-    logging.debug(f"Querying endpoint: {url}")
-    logging.debug(f"Payload: {payload}")
-    api_response = requests.post(url, json=payload)
-
-    return get_response_body(api_response)
-
-
-def get_listing_response(url, item_id):
-    logging.debug(f"Querying endpoint: {url}/{item_id}")
-    api_response = requests.post(url + '/' + item_id)
-
-    return get_response_body(api_response)
-
-
-def get_search_payload(search_query):
+def get_search_payload(search_query, logger):
     payload = {
         'count': FEED_ITEM_LIMIT,
+        'countryCode': search_query.country_obj.code,   # appears to be optional
+        'countryId': search_query.country_obj.geocode,
         'filters': [],
         'query': search_query.query,
         'sortParam': {
@@ -122,155 +75,185 @@ def get_search_payload(search_query):
         }
         payload['filters'].append(used_dict)
 
-    if search_query.country:
-        payload['countryId'] = get_country_id(search_query.country)
-
     return payload
 
 
-def get_top_level_feed(base_url, search_query):
+def process_response(response, query_object, logger):
+
+    # return HTTP error code
+    if not response.ok:
+        logger.debug(
+            f'"{query_object.query}" - Error from source, dumping input:')
+        logger.debug(response.text)
+        abort(
+            500, description=f'"{query_object.query}" - HTTP status from source: {response.status_code}')
+
+    try:
+        return response.json()
+    except ValueError:
+        logger.debug(
+            f'"{query_object.query}" - Invalid API response, dumping input:')
+        logger.debug(response.text)
+        abort(
+            500, description=f'"{query_object.query}" - Invalid API response')
+
+
+def get_search_response(base_url, query_object, logger):
+
+    search_url = base_url + SEARCH_ENDPOINT
+
+    payload = get_search_payload(query_object, logger)
+
+    logger.debug(f'"{query_object.query}" - Querying endpoint: {search_url}')
+    logger.debug(f'"{query_object.query}" - Payload: {payload}')
+    response = session.post(search_url, json=payload)
+
+    return process_response(response, query_object, logger)
+
+
+def get_listing_response(base_url, item_id, query_object, logger):
+
+    listing_url = base_url + LISTING_ENDPOINT
+
+    logger.debug(
+        f'"{query_object.query}" - Querying endpoint: {listing_url}{item_id}')
+    response = session.get(listing_url + item_id)
+
+    return process_response(response, query_object, logger)
+
+
+def get_top_level_feed(base_url, query_object):
 
     parse_object = urlparse(base_url)
     domain = parse_object.netloc
 
-    title_strings = [domain, f'Search results for "{search_query.query}"']
+    title_strings = [domain, query_object.query]
 
     filters = []
 
     home_page_url_params = [
-        f"search={quote(search_query.query)}", 'sort_by=time_created,descending']
+        f"search={quote(query_object.query)}", 'sort_by=time_created,descending']
 
-    if search_query.min_price:
-        filters.append(f"min {search_query.min_price}")
-        home_page_url_params.append(f"price_start={search_query.min_price}")
+    if query_object.min_price:
+        filters.append(f"min {query_object.min_price}")
+        home_page_url_params.append(f"price_start={query_object.min_price}")
 
-    if search_query.max_price:
-        filters.append(f"max {search_query.max_price}")
-        home_page_url_params.append(f"price_end={search_query.max_price}")
+    if query_object.max_price:
+        filters.append(f"max {query_object.max_price}")
+        home_page_url_params.append(f"price_end={query_object.max_price}")
 
-    if search_query.used_only:
+    if query_object.used_only:
         filters.append('used only')
         home_page_url_params.append('condition_v2=USED')
 
-    if search_query.strict:
+    if query_object.strict:
         filters.append('strict')
 
     if filters:
         title_strings.append(f"Filtered by {', '.join(filters)}")
 
-    output = {
-        'version': JSONFEED_VERSION_URL,
-        'title': ' - '.join(title_strings),
-        'home_page_url': base_url + 'search/products/?' + '&'.join(home_page_url_params),
-        'favicon': base_url + 'favicon.ico'
-    }
+    json_feed = JsonFeedTopLevel(
+        items=[],
+        title=' - '.join(title_strings),
+        home_page_url=base_url + 'search/products/?' +
+        '&'.join(home_page_url_params),
+        favicon=base_url + 'favicon.ico'
+    )
 
-    return output
+    return json_feed
 
 
-def get_timestamp(base_url, listing_card):
+def get_timestamp(base_url, listing_card, search_query, logger):
+    # attempt to extract timestamp (in Unix time) from search result
+    # if unavailable, extract timestamp (in str) from item listing
+
     TIME_CREATED_KEY = 'time_created'
-    listing_url = base_url + LISTING_ENDPOINT
 
-    item_id = listing_card['id']
-    above_fold = get_flattened_fold(listing_card['aboveFold'])
+    try:
+        item_id = listing_card['id']
+        above_fold = get_flattened_fold(listing_card['aboveFold'])
+        timestamp_dict = above_fold.get(TIME_CREATED_KEY)
 
-    timestamp_dict = above_fold.get(TIME_CREATED_KEY)
-
-    if timestamp_dict is None:
-        logging.warning(
-            'Value ' + TIME_CREATED_KEY + ' not found for search listing ' + item_id)
-        listing_response = get_listing_response(listing_url, item_id)
-
-        try:
-            assert listing_response['data']
+        if timestamp_dict:
+            return timestamp_dict['seconds']['low']
+        else:
+            logger.info(TIME_CREATED_KEY + ' not found for item ' + item_id)
+            response_json = get_listing_response(
+                base_url, item_id, search_query, logger)
             datetime_obj = datetime.strptime(
-                listing_response['data'][TIME_CREATED_KEY], '%Y-%m-%dT%H:%M:%SZ')
-            timestamp = datetime_obj.timestamp()
-        except KeyError:
-            logging.warning(
-                'Value ' + TIME_CREATED_KEY + ' not found for listing ' + item_id)
-            timestamp = datetime.now().timestamp()
-    else:
-        timestamp = timestamp_dict['seconds']['low']
-
-    return timestamp
+                response_json['data'][TIME_CREATED_KEY], '%Y-%m-%dT%H:%M:%SZ')
+            return datetime_obj.timestamp()
+    except KeyError:
+        logger.info('Using default timestamp for item ' + item_id)
+        return datetime.now().timestamp()
 
 
 def get_thumbnail(listing_card):
-    photo_urls = listing_card['photoUrls']
-    if len(photo_urls) > 0:
-        thumbnail_url = photo_urls[0]
+    try:
+        return listing_card['photoUrls'][0]
+    except KeyError:
+        return None
 
-    return thumbnail_url
 
+def get_search_results(search_query, logger):
 
-def get_listing(search_query):
-    search_payload = get_search_payload(search_query)
+    base_url = 'https://' + search_query.country_obj.domain + '/'
 
-    base_url = get_redirected_domain()
-    search_url = base_url + SEARCH_ENDPOINT
-
-    response_body = get_search_response(search_url, search_payload)
-    output = get_top_level_feed(base_url, search_query)
+    response_json = get_search_response(base_url, search_query, logger)
 
     if search_query.strict:
         term_list = set([term.lower() for term in search_query.query.split()])
-        logging.debug(f"Strict mode enabled, title must contain: {term_list}")
+        logger.debug(
+            f'"{search_query.query}" - strict mode enabled, title must contain: {term_list}')
 
-    try:
-        assert response_body['data']['results']
-        logging.debug(f"{len(response_body['data']['results'])} results found")
-    except KeyError:
-        msg = 'No results found.'
-        logging.warning(msg)
-        output['items'] = []
-        return output
+    json_feed = get_top_level_feed(base_url, search_query)
 
-    items = []
+    data_json = response_json.get('data')
+    results = data_json.get('results')
 
-    for result in response_body['data']['results']:
-        listing_card = result['listingCard']
-        username = listing_card['seller']['username']
+    if results:
+        for result in results:
+            listing_card = result.get('listingCard')
+            username = listing_card.get('seller').get('username')
 
-        item_id = listing_card['id']
-        item_url = base_url + f"p/{item_id}"
+            item_id = listing_card.get('id')
+            item_url = base_url + 'p/' + item_id
 
-        below_fold = get_flattened_fold(listing_card['belowFold'])
-        item_title = below_fold['header_1']
-        item_price = below_fold['header_2']
-        item_desc = below_fold['paragraph1']
+            below_fold = get_flattened_fold(listing_card.get('belowFold'))
+            item_title = below_fold.get('header_1')
+            item_price = below_fold.get('header_2')
+            item_desc = below_fold.get('paragraph1')
 
-        timestamp = get_timestamp(base_url, listing_card)
-        thumbnail_url = get_thumbnail(listing_card)
+            timestamp = get_timestamp(
+                base_url, listing_card, search_query, logger)
+            thumbnail_url = get_thumbnail(listing_card)
 
-        content_body = f'<img src=\"{thumbnail_url}\" /><p>{item_desc}</p>'
+            content_body = f'<img src=\"{thumbnail_url}\" /><p>{item_desc}</p>'
 
-        item = {
-            'id': item_url,
-            'url': item_url,
-            'title': f"[{item_price}] {item_title}",
-            'content_html': bleach.clean(
-                content_body,
-                tags=allowed_tags,
-                attributes=allowed_attributes,
-                styles=allowed_styles
-            ),
-            'date_published': datetime.utcfromtimestamp(timestamp).isoformat('T'),
-            'author': {
-                'name': username
-            }
-        }
+            feed_item = JsonFeedItem(
+                id=item_url,
+                url=item_url,
+                title=f"[{item_price}] {item_title}",
+                content_html=bleach.clean(
+                    content_body,
+                    tags=allowed_tags,
+                    attributes=allowed_attributes
+                ),
+                date_published=datetime.utcfromtimestamp(
+                    timestamp).isoformat('T'),
+                author=JsonFeedAuthor(name=username)
+            )
 
-        if thumbnail_url is not None:
-            item['image'] = thumbnail_url
+            if thumbnail_url:
+                feed_item.image = thumbnail_url
 
-        if not search_query.strict or (term_list and all(item_title.lower().find(term) >= 0 for term in term_list)):
-            items.append(item)
-        else:
-            logging.debug(f'Strict mode enabled, item "{item_title}" removed')
+            if search_query.strict and (term_list and not all(item_title.lower().find(term) >= 0 for term in term_list)):
+                logger.debug(
+                    f'"{search_query.query}" - strict mode - removed {item_id} "{item_title}"')
+            else:
+                json_feed.items.append(feed_item)
 
-    output['items'] = items
-    logging.debug(f"{len(items)} results published")
+        logger.info(
+            f'"{search_query.query}" - found {len(results)} - published {len(json_feed.items)}')
 
-    return output
+    return remove_empty_from_dict(asdict(json_feed))

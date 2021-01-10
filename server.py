@@ -1,58 +1,48 @@
-from flask import Flask, request, jsonify
-from requests import exceptions
+from flask import Flask, request, jsonify, abort
+from flask.logging import create_logger
 
-from carousell_feed import get_listing
-from search_query_class import SearchQueryClass
+from carousell_feed import get_search_results
+from carousell_feed_data import CarousellSearchQuery, QueryStatus
 
 
 app = Flask(__name__)
+app.config.update({'JSONIFY_MIMETYPE': 'application/feed+json'})
+logger = create_logger(app)
 
 
-def string_to_boolean(string):
-    return string.lower().strip() in ['yes', 'true']
+def generate_response(query_object):
+    if not query_object.status.ok:
+        abort(400, description='Errors found: ' +
+              ', '.join(query_object.status.errors))
+
+    logger.debug(query_object)  # log values
+
+    output = get_search_results(query_object, logger)
+    return jsonify(output)
 
 
 @app.route('/', methods=['GET'])
-def form():
-    query_text = request.args.get('query')
+@app.route('/search', methods=['GET'])
+def process_query():
+    query = request.args.get('query')
+    country = request.args.get('country')
     min_price = request.args.get('min_price')
     max_price = request.args.get('max_price')
-    country_text = request.args.get('country')
-    used_only_text = request.args.get('used_only')
-    strict_text = request.args.get('strict')
+    used_only = request.args.get('used_only')
+    strict = request.args.get('strict')
 
-    if not isinstance(query_text, str):
-        return 'Please provide a valid query string.'
+    search_query = CarousellSearchQuery(
+        query=query,
+        min_price=min_price,
+        max_price=max_price,
+        country=country,
+        used_only=used_only,
+        strict=strict,
+        status=QueryStatus()
+    )
 
-    if min_price and not min_price.isnumeric():
-        return 'Invalid min price.'
-
-    if max_price and not max_price.isnumeric():
-        return 'Invalid max price.'
-
-    country = False
-
-    if country_text:
-        if isinstance(country_text, str) and len(country_text) == 2:
-            country = country_text.upper()
-        else:
-            return 'Please provide a valid country code.'
-
-    used_only = True if isinstance(
-        used_only_text, str) and string_to_boolean(used_only_text) else False
-
-    strict = True if isinstance(
-        strict_text, str) and string_to_boolean(strict_text) else False
-
-    search_query = SearchQueryClass(
-        query_text, min_price, max_price, country, used_only, strict)
-
-    try:
-        output = get_listing(search_query)
-        return jsonify(output)
-    except exceptions.RequestException:
-        return f"Error generating output for query {query_text}."
+    return generate_response(search_query)
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', use_reloader=False)
