@@ -86,7 +86,7 @@ def process_response(response, query_object, logger):
             f'"{query_object.query}" - error from source, dumping input:')
         logger.debug(response.text)
         abort(
-            500, description='HTTP status from source: ' + response.status_code)
+            500, description='HTTP status from source: ' + str(response.status_code))
 
     try:
         return response.json()
