@@ -82,16 +82,16 @@ def process_response(response, query_object, logger):
 
     # return HTTP error code
     if not response.ok:
-        logger.error(query_object.query + ' - error from source')
-        logger.debug(query_object.query + ' - dumping input:' + response.text)
+        logger.error(f'"{query_object.query}" - error from source')
+        logger.debug(f'"{query_object.query}" - dumping input: {response.text}')
         abort(
-            500, description='HTTP status from source: ' + str(response.status_code))
+            500, description=f"HTTP status from source: {response.status_code}")
 
     try:
         return response.json()
     except ValueError:
-        logger.error(query_object.query + ' - invalid API response')
-        logger.debug(query_object.query + ' - dumping input:' + response.text)
+        logger.error(f'"{query_object.query}" - invalid API response')
+        logger.debug(f'"{query_object.query}" - dumping input: {response.text}')
         abort(
             500, description='Invalid API response')
 
