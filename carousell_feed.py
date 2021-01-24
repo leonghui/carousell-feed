@@ -249,7 +249,9 @@ def get_search_results(search_query, logger):
                 content_html=sanitized_html,
                 date_published=datetime.utcfromtimestamp(
                     timestamp).isoformat('T'),
+                authors=[JsonFeedAuthor(name=username)],
                 author=JsonFeedAuthor(name=username)
+
             )
 
             if search_query.strict and (term_list and not all(item_title.lower().find(term) >= 0 for term in term_list)):
