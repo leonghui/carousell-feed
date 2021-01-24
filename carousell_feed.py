@@ -97,7 +97,7 @@ def get_search_response(base_url, query_object, logger):
     logger.debug(f'"{query_object.query}" - payload: {payload}')
 
     try:
-    response = session.post(search_url, json=payload)
+        response = session.post(search_url, json=payload)
     except Exception as ex:
         logger.error(f'"{query_object.query}" - Exception: {ex}')
         abort(500, description=ex)
@@ -113,7 +113,7 @@ def get_listing_response(base_url, item_id, query_object, logger):
         f'"{query_object.query}" - querying endpoint: {listing_url}{item_id}')
 
     try:
-    response = session.get(listing_url + item_id)
+        response = session.get(listing_url + item_id)
         sleep(1)
     except Exception as ex:
         logger.error(f'"{query_object.query}" - Exception: {ex}')
