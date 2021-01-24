@@ -2,7 +2,6 @@ from datetime import datetime
 from urllib.parse import quote, urlparse, urlencode
 from flask import abort
 from requests import Session
-from dataclasses import asdict
 from time import sleep
 
 import bleach
@@ -20,16 +19,6 @@ allowed_attributes = bleach.ALLOWED_ATTRIBUTES.copy()
 allowed_attributes.update({'img': ['src']})
 
 session = Session()
-
-
-# modified from https://stackoverflow.com/a/24893252
-def remove_empty_from_dict(d):
-    if isinstance(d, dict):
-        return dict((k, remove_empty_from_dict(v)) for k, v in d.items() if v and remove_empty_from_dict(v))
-    elif isinstance(d, list):
-        return [remove_empty_from_dict(v) for v in d if v and remove_empty_from_dict(v)]
-    else:
-        return d
 
 
 def get_flattened_fold(fold_objects):
@@ -272,4 +261,4 @@ def get_search_results(search_query, logger):
         logger.info(
             f'"{search_query.query}" - found {len(results)} - published {len(json_feed.items)}')
 
-    return remove_empty_from_dict(asdict(json_feed))
+    return json_feed
