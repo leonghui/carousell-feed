@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import List
 
 
 @dataclass
@@ -29,8 +30,8 @@ def string_to_boolean(string):
 
 @dataclass
 class QueryStatus():
+    errors: List[str]
     ok: bool = True
-    errors: list[str] = field(default_factory=list)
 
     def refresh(self):
         self.ok = False if self.errors else True

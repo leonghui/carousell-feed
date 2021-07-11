@@ -38,7 +38,7 @@ def process_query():
         country=country,
         used_only=used_only,
         strict=strict,
-        status=QueryStatus()
+        status=QueryStatus(errors=[])
     )
 
     return generate_response(search_query)

@@ -159,7 +159,8 @@ def get_top_level_feed(base_url, query_object):
         title=' - '.join(title_strings),
         home_page_url=base_url + 'search/products/?' +
         urlencode(search_params_dict),
-        favicon=base_url + 'favicon.ico'
+        favicon=base_url + 'favicon.ico',
+        authors=[]
     )
 
     return json_feed
