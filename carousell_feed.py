@@ -11,7 +11,7 @@ from json_feed_data import JsonFeedTopLevel, JsonFeedItem, JsonFeedAuthor
 
 
 FEED_ITEM_LIMIT = 22
-SEARCH_ENDPOINT = 'api-service/filter/search/3.3/products/'
+SEARCH_ENDPOINT = 'api-service/filter/cf/4.0/search/'
 LISTING_ENDPOINT = 'api-service/listing/3.1/listings/'
 
 allowed_tags = bleach.ALLOWED_TAGS + ['img', 'p']
